@@ -2,6 +2,7 @@ import os
 import time
 
 from libcloud.common.google import GoogleBaseError, ResourceNotFoundError
+from libcloud.compute.drivers.gce import GCESubnetwork, GCENetwork, GCEAddress
 from sdcm.utils.common import list_instances_gce, gce_meta_to_dict
 
 from sdcm import cluster
@@ -262,7 +263,28 @@ class GCECluster(cluster.BaseCluster):  # pylint: disable=too-many-instance-attr
                 },
                 "autoDelete": True}
 
-    def _create_instance(self, node_index, dc_idx, spot=False):
+    def _prepare_interfaces(self, dc_idx, interfaces):
+        if interfaces is None:
+            return None
+        def get_param(data, param, target_class):
+            result = data.get(param, None)
+            if isinstance(result, dict):
+                result = target_class(**result)
+            return result
+        output = []
+        for interface in interfaces:
+            output.append(
+                self._gce_services[dc_idx]._build_network_gce_struct(
+                    network=get_param(interface, 'network', GCENetwork),
+                    use_selflinks=interface.get('use_selflinks', True),
+                    subnetwork=get_param(interface, 'subnetwork', GCESubnetwork),
+                    external_ip=get_param(interface, 'external_ip', GCEAddress),
+                    internal_ip=get_param(interface, 'internal_ip', GCEAddress)
+                )
+            )
+        return output
+
+    def _create_instance(self, node_index, dc_idx, spot=False, interfaces=None):
         # if size of disk is larget than 80G, then
         # change the timeout of job completion to default * 3.
 
@@ -289,11 +311,13 @@ class GCECluster(cluster.BaseCluster):  # pylint: disable=too-many-instance-attr
         # Name must start with a lowercase letter followed by up to 63
         # lowercase letters, numbers, or hyphens, and cannot end with a hyphen
         assert len(name) <= 63, "Max length of instance name is 63"
+
+
         create_node_params = dict(name=name,
                                   size=self._gce_instance_type,
                                   image=self._gce_image,
-                                  ex_network=self._gce_network,
                                   ex_disks_gce_struct=gce_disk_struct,
+                                  ex_nic_gce_struct=self._prepare_interfaces(dc_idx, interfaces),
                                   ex_metadata=gce_create_metadata(
                                       {'Name': name,
                                        'NodeIndex': node_index,
@@ -316,8 +340,19 @@ class GCECluster(cluster.BaseCluster):  # pylint: disable=too-many-instance-attr
     def _create_instances(self, count, dc_idx=0):
         spot = 'spot' in self.instance_provision
         instances = []
+        interfaces = [
+            {
+            'network': self._gce_network,
+            'external_ip': 'ephemeral'
+            }
+        ]
+        if self.aws_extra_network_interface:
+            interfaces.append({
+                'network': self._gce_network,
+                'external_ip': 'ephemeral'
+                })
         for node_index in range(self._node_index + 1, self._node_index + count + 1):
-            instances.append(self._create_instance(node_index, dc_idx, spot))
+            instances.append(self._create_instance(node_index, dc_idx, spot, interfaces=interfaces))
         return instances
 
     def _get_instances_by_prefix(self, dc_idx=0):
