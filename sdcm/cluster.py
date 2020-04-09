@@ -3258,6 +3258,9 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods
             nemesis_thread.join(timeout)
         self.nemesis_threads = []
 
+    def clear_termination_event(self):
+        self.termination_event.clear()
+
     def node_config_setup(self, node, seed_address=None, endpoint_snitch=None, murmur3_partitioner_ignore_msb_bits=None, client_encrypt=None):  # pylint: disable=too-many-arguments,invalid-name
         node.config_setup(seed_address=seed_address,
                           cluster_name=self.name,  # pylint: disable=no-member
