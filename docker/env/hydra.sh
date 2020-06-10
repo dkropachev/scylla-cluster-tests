@@ -47,7 +47,7 @@ subcommand="$1"
 if [[ ${subcommand} == 'bash'* ]] || [[ ${subcommand} == 'python'* ]]; then
     echo "running  ${subcommand}"
 else
-    CMD="./sct.py $@"
+    CMD="py-spy top --subprocesses -- python ./sct.py $@ >./$1.log 2>&1"
 fi
 
 # export all SCT_* env vars into the docker run
@@ -66,6 +66,11 @@ group_args=()
 for gid in $(id -G); do
     group_args+=(--group-add "$gid")
 done
+
+cp ${SCT_DIR}/requirements-python.txt ${SCT_DIR}/docker/env
+cp ${SCT_DIR}/install-prereqs.sh ${SCT_DIR}/docker/env
+
+docker build --tag custom_build ${SCT_DIR}/docker/env
 
 docker run --rm ${TTY_STDIN} --privileged \
     -h ${HOST_NAME} \
@@ -95,5 +100,5 @@ docker run --rm ${TTY_STDIN} --privileged \
     ${AWS_OPTIONS} \
     --net=host \
     --name=${SCT_TEST_ID} \
-    ${DOCKER_REPO}:${VERSION} \
+    custom_build \
     /bin/bash -c "sudo ln -s '${SCT_DIR}' '${WORK_DIR}'; ${TERM_SET_SIZE} eval '${CMD}'"
