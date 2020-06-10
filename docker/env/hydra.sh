@@ -47,7 +47,7 @@ subcommand="$1"
 if [[ ${subcommand} == 'bash'* ]] || [[ ${subcommand} == 'python'* ]]; then
     echo "running  ${subcommand}"
 else
-    CMD="py-spy top --subprocesses -- python ./sct.py $@ >./$1.log 2>&1"
+    CMD="py-spy top --subprocesses -- python3 ./sct.py $@ >./$1.log 2>&1"
 fi
 
 # export all SCT_* env vars into the docker run
