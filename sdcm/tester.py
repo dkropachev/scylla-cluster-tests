@@ -222,6 +222,17 @@ def critical_failure_handler(signum, frame):  # pylint: disable=unused-argument
 
 signal.signal(signal.SIGUSR2, critical_failure_handler)
 
+import logging
+logger = logging.getLogger('SIGNAL_HANDLER')
+
+def signal_handler(signal_num, frame):
+    print(f'Got a signal [{signal_num}]')
+    logger.error(f'Got a signal [{signal_num}]')
+
+
+for signal_name in ['SIGABRT','SIGALRM','SIGBUS','SIGCHLD','SIGCLD','SIGCONT','SIGFPE','SIGHUP','SIGILL','SIGINT','SIGIO','SIGIOT','SIGKILL','SIGPIPE','SIGPOLL','SIGPROF','SIGPWR','SIGQUIT','SIGRTMAX','SIGRTMIN','SIGSEGV','SIGSTOP','SIGSYS','SIGTERM','SIGTRAP','SIGTSTP','SIGTTIN','SIGTTOU','SIGURG','SIGUSR1','SIGUSR2','SIGVTALRM','SIGWINCH','SIGXCPU','SIGXFSZ']:
+    signal.signal(getattr(signal, signal_name), signal_handler)
+
 
 class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     def __init__(self, *args):  # pylint: disable=too-many-statements

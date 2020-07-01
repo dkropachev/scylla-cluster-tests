@@ -202,6 +202,9 @@ def call(Map pipelineParams) {
                 }
             }
             stage('Run SCT Test') {
+                options {
+                    timeout(time: 20, unit: 'SECONDS')
+                }
                 steps {
                     catchError(stageResult: 'FAILURE') {
                         script {
