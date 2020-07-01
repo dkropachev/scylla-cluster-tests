@@ -8,7 +8,6 @@ from mypy_boto3_ec2 import EC2Client, EC2ServiceResource
 from botocore.exceptions import ClientError, NoRegionError
 
 from sdcm.utils.decorators import retrying
-from sdcm.utils.pricing import AWSPricing
 
 LOGGER = logging.getLogger(__name__)
 
