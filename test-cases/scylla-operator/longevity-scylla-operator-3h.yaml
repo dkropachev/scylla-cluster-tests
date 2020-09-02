@@ -12,8 +12,10 @@ k8s_scylla_disk_gi: 30
 n_db_nodes: 3
 n_loaders: 2
 n_monitor_nodes: 1
+use_mgmt: true
+backup_bucket_location: 'manager-backup-tests-us-east-1'
 
-nemesis_class_name: 'KubernetesScyllaOperatorMonkey'
+nemesis_class_name: 'MgmtBackup'
 nemesis_interval: 5
 
 user_prefix: 'k8s-longevity-10gb-3h'
