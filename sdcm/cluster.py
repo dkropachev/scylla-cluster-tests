@@ -27,7 +27,7 @@ import uuid
 import itertools
 
 from collections import defaultdict
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict, Union, Iterable
 from textwrap import dedent
 from datetime import datetime
 from functools import cached_property, wraps
@@ -1287,7 +1287,7 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
             self,
             patterns: Optional[List[Union[str, re.Pattern, DatabaseLogEvent]]] = None,
             start_from_beginning: bool = False
-    ) -> List[str]:
+    ) -> Iterable[str]:
         stream = File(self.system_log)
         if not start_from_beginning:
             stream.move_to_end()

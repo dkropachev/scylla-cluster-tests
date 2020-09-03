@@ -2101,21 +2101,14 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self._set_current_disruption('HotReloadInternodeCertificate')
         if not self.cluster.params.get('server_encrypt', None):
             raise UnsupportedNemesis('Server Encryption is not enabled, hence skipping')
-
-        @retrying(allowed_exceptions=LogContentNotFound)
-        def check_ssl_reload_log(target_node, file_path, since_time):
-            msg = target_node.remoter.run(f'journalctl -u scylla-server --since="{since_time}" | '
-                                          f'grep Reload | grep {file_path}', ignore_status=True)
-            if not msg.stdout:
-                raise LogContentNotFound('Reload SSL message not found in node log')
-            return msg.stdout
-
+        log_reader = {}
         ssl_files_location = json.loads(
             self.target_node.get_scylla_config_param("server_encryption_options"))["certificate"]
         in_place_crt = self.target_node.remoter.run(f"cat {ssl_files_location}",
                                                     ignore_status=True).stdout
         update_certificates()
-        time_now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        for node in self.cluster.nodes:
+            log_reader[node] = node.follow_system_log(f'.*Reload.*{ssl_files_location}.*')
         for node in self.cluster.nodes:
             node.remoter.send_files(src='data_dir/ssl_conf/db.crt', dst='/tmp')
         for node in self.cluster.nodes:
@@ -2124,9 +2117,15 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             new_crt = node.remoter.run(f"cat {ssl_files_location}").stdout
             if in_place_crt == new_crt:
                 raise Exception('The CRT file was not replaced with the new one')
-            reload = check_ssl_reload_log(target_node=node, file_path=ssl_files_location,
-                                          since_time=time_now)
-            if not reload:
+            certificate_was_reloaded = wait.wait_for(
+                func=lambda node_log_reader: list(node_log_reader),
+                timeout=300,
+                step=10,
+                throw_exc=False,
+                text='Wait for scylla to reload ssl certificate',
+                node_log_reader=log_reader[node]
+            )
+            if not certificate_was_reloaded:
                 raise Exception('SSL auto Reload did not happen')
 
         self.log.info('hot reloading internode ssl nemesis finished')
@@ -2270,6 +2269,7 @@ def log_time_elapsed_and_status(method):  # pylint: disable=too-many-statements
 
 class SslHotReloadingNemesis(Nemesis):
     disruptive = False
+    kubernetes = True
 
     @log_time_elapsed_and_status
     def disrupt(self):
