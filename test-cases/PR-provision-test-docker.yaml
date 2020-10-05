@@ -16,3 +16,9 @@ user_prefix: 'PR-provision-docker'
 scylla_version: 4.0.0
 system_auth_rf: 0
 monitor_swap_size: 0
+max_partitions_in_test_table: 10
+
+post_behavior_db_nodes: "destroy"
+post_behavior_loader_nodes: "destroy"
+post_behavior_monitor_nodes: "destroy"
+backtrace_decoding: false
