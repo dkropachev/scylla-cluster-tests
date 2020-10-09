@@ -33,6 +33,8 @@ LOGGER = logging.getLogger(__name__)
 
 
 class GkeCluster(KubernetesCluster, cluster.BaseCluster):
+    _shorten_name = True
+
     def __init__(self,
                  gke_cluster_version,
                  gce_image_type,
@@ -183,6 +185,7 @@ class GkeCluster(KubernetesCluster, cluster.BaseCluster):
 
 
 class GkeScyllaPodContainer(BasePodContainer, IptablesPodIpRedirectMixin):
+
     @cached_property
     def gce_node_ips(self):
         gce_node_name = self._pod.spec.node_name
@@ -203,6 +206,7 @@ class GkeScyllaPodContainer(BasePodContainer, IptablesPodIpRedirectMixin):
 
 
 class GkeScyllaPodCluster(ScyllaPodCluster, IptablesClusterOpsMixin):
+    _shorten_name = True
     PodContainerClass = GkeScyllaPodContainer
 
     def add_nodes(self,

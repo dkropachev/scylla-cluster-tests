@@ -73,6 +73,7 @@ from sdcm.utils.rsyslog import RSYSLOG_SSH_TUNNEL_LOCAL_PORT
 from sdcm.logcollector import GrafanaSnapshot, GrafanaScreenShot, PrometheusSnapshots, upload_archive_to_s3
 from sdcm.utils.remote_logger import get_system_logging_thread
 from sdcm.utils.scylla_args import ScyllaArgParser
+from sdcm.utils.scylla_yaml import get_scylla_yaml_from_config, get_config_from_params
 from sdcm.utils.file import File
 from sdcm.coredump import CoredumpExportSystemdThread
 
@@ -1583,159 +1584,134 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
                      alternator_enforce_authorization=False,
                      internode_compression=None,
                      internode_encryption=None):
-        with self.remote_scylla_yaml(yaml_file) as scylla_yml:
-            if seed_address:
-                # Set seeds
-                scylla_yml['seed_provider'] = [
-                    dict(class_name='org.apache.cassandra.locator.SimpleSeedProvider',
-                         parameters=[dict(seeds=seed_address)])]
+        self.prepare_node_for_config(
+            server_encrypt=server_encrypt,
+            client_encrypt=client_encrypt,
+            append_scylla_yaml=append_scylla_yaml,
+            append_scylla_args=append_scylla_args,
+            debug_install=debug_install)
 
-                # NOTICE: the following configuration always have to use private_ip_address for multi-region to work
-                # Set listen_address
-                scylla_yml['listen_address'] = self.private_ip_address
-                # Set rpc_address
-                scylla_yml['rpc_address'] = self.private_ip_address
+        with self.remote_scylla_yaml(yaml_file) as scylla_yaml:
+            get_scylla_yaml_from_config(
+                seed_address=seed_address,
+                cluster_name=cluster_name,
+                enable_exp=enable_exp,
+                endpoint_snitch=endpoint_snitch,
+                broadcast=broadcast,
+                authenticator=authenticator,
+                server_encrypt=server_encrypt,
+                client_encrypt=client_encrypt,
+                append_scylla_yaml=append_scylla_yaml,
+                hinted_handoff=hinted_handoff,
+                murmur3_partitioner_ignore_msb_bits=murmur3_partitioner_ignore_msb_bits,
+                authorizer=authorizer,
+                alternator_port=alternator_port,
+                listen_on_all_interfaces=listen_on_all_interfaces,
+                ip_ssh_connections=ip_ssh_connections,
+                alternator_enforce_authorization=alternator_enforce_authorization,
+                internode_compression=internode_compression,
+                internode_encryption=internode_encryption,
+                private_ip_address=self.private_ip_address,
+                ip_address=self.ip_address,
+                enable_auto_bootstrap=self.enable_auto_bootstrap,
+                replacement_node_ip=self.replacement_node_ip,
+                scylla_yaml=scylla_yaml
+            )
 
-            if listen_on_all_interfaces:
-                # Set listen_address
-                scylla_yml['listen_address'] = "0.0.0.0"
-                # Set rpc_address
-                scylla_yml['rpc_address'] = "0.0.0.0"
+    def prepare_node_for_config(
+            self,
+            server_encrypt=None,
+            client_encrypt=None,
+            append_scylla_yaml=None,
+            append_scylla_args=None,
+            debug_install=False):
 
-            if broadcast:
-                # Set broadcast_address
-                scylla_yml['broadcast_address'] = broadcast
+        if server_encrypt:
+            self.prepare_server_encryption()
 
-                # Set broadcast_rpc_address
-                scylla_yml['broadcast_rpc_address'] = broadcast
+        if client_encrypt:
+            self.prepare_cqlsh_for_client_encryption()
+            self.prepare_client_encryption()
 
-            if cluster_name:
-                scylla_yml['cluster_name'] = cluster_name
-
-            # disable hinted handoff (it is enabled by default in Scylla). Expected values: "enabled"/"disabled"
-            if hinted_handoff == 'disabled':
-                scylla_yml['hinted_handoff_enabled'] = False
-
-            if ip_ssh_connections == 'ipv6':
-                self.log.debug('Enable IPv6 DNS lookup')
-                scylla_yml['enable_ipv6_dns_lookup'] = True
-
-                scylla_yml['prometheus_address'] = self.ip_address
-                scylla_yml['broadcast_rpc_address'] = self.ip_address
-                scylla_yml['listen_address'] = self.ip_address
-                scylla_yml['rpc_address'] = self.ip_address
-
-            if murmur3_partitioner_ignore_msb_bits:
-                self.log.debug('Change murmur3_partitioner_ignore_msb_bits to {}'.format(
-                    murmur3_partitioner_ignore_msb_bits))
-                scylla_yml['murmur3_partitioner_ignore_msb_bits'] = int(murmur3_partitioner_ignore_msb_bits)
-
-            if enable_exp:
-                scylla_yml['experimental'] = True
-
-            if endpoint_snitch:
-                scylla_yml['endpoint_snitch'] = endpoint_snitch
-
-            if not client_encrypt:
-                scylla_yml['client_encryption_options'] = dict(enabled=False)
-
-            if self.enable_auto_bootstrap:
-                scylla_yml['auto_bootstrap'] = True
-            else:
-                if 'auto_bootstrap' in scylla_yml:
-                    scylla_yml['auto_bootstrap'] = False
-
-            if authenticator in ['AllowAllAuthenticator', 'PasswordAuthenticator']:
-                scylla_yml['authenticator'] = authenticator
-
-            if authorizer in ['AllowAllAuthorizer', 'CassandraAuthorizer']:
-                scylla_yml['authorizer'] = authorizer
-
-            if server_encrypt or client_encrypt:
-                self.config_client_encrypt()
-            if server_encrypt:
-                scylla_yml['server_encryption_options'] = dict(internode_encryption=internode_encryption,
-                                                               certificate='/etc/scylla/ssl_conf/db.crt',
-                                                               keyfile='/etc/scylla/ssl_conf/db.key',
-                                                               truststore='/etc/scylla/ssl_conf/cadb.pem')
-
-            if client_encrypt:
-                scylla_yml['client_encryption_options'] = dict(enabled=True,
-                                                               certificate='/etc/scylla/ssl_conf/client/test.crt',
-                                                               keyfile='/etc/scylla/ssl_conf/client/test.key',
-                                                               truststore='/etc/scylla/ssl_conf/client/catest.pem')
-
-            if self.replacement_node_ip:
-                scylla_yml['replace_address_first_boot'] = self.replacement_node_ip
-            else:
-                if 'replace_address_first_boot' in scylla_yml:
-                    del scylla_yml['replace_address_first_boot']
-
-            if alternator_port:
-                scylla_yml['alternator_port'] = alternator_port
-                scylla_yml['alternator_write_isolation'] = alternator.enums.WriteIsolation.ALWAYS_USE_LWT.value
-
-            if alternator_enforce_authorization:
-                scylla_yml['alternator_enforce_authorization'] = True
-            else:
-                scylla_yml['alternator_enforce_authorization'] = False
-
-            if internode_compression:
-                scylla_yml['internode_compression'] = internode_compression
-
-            if append_scylla_yaml:
-                scylla_yml.update(yaml.safe_load(append_scylla_yaml))
-
-        if append_scylla_yaml:
-            if any(substr in append_scylla_yaml for substr in ("system_key_directory",
-                                                               "system_info_encryption",
-                                                               "kmip_hosts:", )):
-                self.remoter.send_files(src="./data_dir/encrypt_conf", dst="/tmp/")
-                self.remoter.sudo(shell_script_cmd("""\
-                    rm -rf /etc/encrypt_conf
-                    mv -f /tmp/encrypt_conf /etc
-                    mkdir -p /etc/scylla/encrypt_conf /etc/encrypt_conf/system_key_dir
-                    chown -R scylla:scylla /etc/scylla /etc/encrypt_conf
-                """))
-                self.remoter.sudo("md5sum /etc/encrypt_conf/*.pem", ignore_status=True)
+        if self.parent_cluster.is_kmip_enabled(append_scylla_yaml=append_scylla_yaml):
+            self.prepare_for_kmip()
 
         if append_scylla_args:
-            scylla_help = self.remoter.run("scylla --help", ignore_status=True).stdout
-            scylla_arg_parser = ScyllaArgParser.from_scylla_help(scylla_help)
-            append_scylla_args = scylla_arg_parser.filter_args(append_scylla_args)
+            self.patch_scylla_args(self.filter_scylla_args(append_scylla_args))
 
+        if debug_install and self.distro.is_rhel_like:
+            self.remoter.sudo("yum install -y scylla-gdb", verbose=True, ignore_status=True)
+
+        if self.init_system == "systemd":
+            self.patch_systemd()
+
+    def filter_scylla_args(self, append_scylla_args: str) -> str:
+        scylla_help = self.remoter.run("scylla --help", ignore_status=True).stdout
+        scylla_arg_parser = ScyllaArgParser.from_scylla_help(scylla_help)
+        return scylla_arg_parser.filter_args(append_scylla_args)
+
+    def patch_scylla_args(self, append_scylla_args: str):
         if append_scylla_args:
             self.log.debug("Append following args to scylla: `%s'", append_scylla_args)
             scylla_server_config = f"/etc/{'sysconfig' if self.distro.is_rhel_like else 'default'}/scylla-server"
             self.remoter.sudo(
                 f"sed -i '/{append_scylla_args}/! s/SCYLLA_ARGS=\"/&{append_scylla_args} /' {scylla_server_config}")
 
-        if debug_install and self.distro.is_rhel_like:
-            self.remoter.sudo("yum install -y scylla-gdb", verbose=True, ignore_status=True)
+    def patch_systemd(self):
+        systemd_version = get_systemd_version(self.remoter.run("systemctl --version", ignore_status=True).stdout)
+        if systemd_version >= 240:
+            self.log.debug("systemd version %d >= 240: we can change FinalKillSignal", systemd_version)
+            self.remoter.sudo(shell_script_cmd("""\
+                mkdir -p /etc/systemd/system/scylla-server.service.d
+                cat <<EOF > /etc/systemd/system/scylla-server.service.d/override.conf
+                [Service]
+                FinalKillSignal=SIGABRT
+                EOF
+                systemctl daemon-reload
+            """))
 
-        if self.init_system == "systemd":
-            systemd_version = get_systemd_version(self.remoter.run("systemctl --version", ignore_status=True).stdout)
-            if systemd_version >= 240:
-                self.log.debug("systemd version %d >= 240: we can change FinalKillSignal", systemd_version)
-                self.remoter.sudo(shell_script_cmd("""\
-                    mkdir -p /etc/systemd/system/scylla-server.service.d
-                    cat <<EOF > /etc/systemd/system/scylla-server.service.d/override.conf
-                    [Service]
-                    FinalKillSignal=SIGABRT
-                    EOF
-                    systemctl daemon-reload
-                """))
+    def prepare_for_kmip(self):
+        self.remoter.send_files(src="./data_dir/encrypt_conf", dst="/tmp/")
+        self.remoter.sudo(shell_script_cmd("""\
+            rm -rf /etc/encrypt_conf
+            mv -f /tmp/encrypt_conf /etc
+            mkdir -p /etc/scylla/encrypt_conf /etc/encrypt_conf/system_key_dir
+            chown -R scylla:scylla /etc/scylla /etc/encrypt_conf
+        """))
+        self.remoter.sudo("md5sum /etc/encrypt_conf/*.pem", ignore_status=True)
 
-    def config_client_encrypt(self):
-        self.remoter.send_files(src='./data_dir/ssl_conf', dst='/tmp/')  # pylint: disable=not-callable
+    def prepare_cqlsh_for_client_encryption(self):
+        if not self.remoter.run('ls /tmp/client', ignore_status=True).ok:
+            self.remoter.send_files(src='./data_dir/ssl_conf/client', dst='/tmp/')  # pylint: disable=not-callable
+        # To avoid following warning from cqlsh, we need to remove ~/.cqlshrc:
+        #   Warning: cqlshrc config files were found at both the old location (~/.cqlshrc) and
+        #   the new location (~/.cassandra/cqlshrc), the old config file will not be migrated to the new location,
+        #   and the new location will be used for now.  You should manually consolidate the config files
+        #   at the new location and remove the old file.'
         setup_script = dedent("""
+            rm ~/.cqlshrc 2>/dev/null || true
             mkdir -p ~/.cassandra/
-            cp /tmp/ssl_conf/client/cqlshrc ~/.cassandra/
-            sudo mkdir -p /etc/scylla/
-            sudo rm -rf /etc/scylla/ssl_conf/
-            sudo mv -f /tmp/ssl_conf/ /etc/scylla/
+            cp /tmp/client/cqlshrc ~/.cassandra/
         """)
         self.remoter.run('bash -cxe "%s"' % setup_script)
+
+    def prepare_client_encryption(self):
+        if not self.remoter.run('ls /tmp/client', ignore_status=True).ok:
+            self.remoter.send_files(src='./data_dir/ssl_conf/client', dst='/tmp/')  # pylint: disable=not-callable
+        setup_script = dedent("""
+            sudo mkdir -p /etc/scylla/ssl_conf/client
+            sudo mv -f /tmp/client/* /etc/scylla/ssl_conf/client
+        """)
+        self.remoter.run('bash -cxe "%s"' % setup_script)
+
+    def prepare_server_encryption(self):
+        self.remoter.send_files(src='./data_dir/ssl_conf', dst='/tmp/')  # pylint: disable=not-callable
+        setup_script = dedent("""
+            mkdir -p /etc/scylla/
+            rm -rf /etc/scylla/ssl_conf/
+            mv -f /tmp/ssl_conf/ /etc/scylla/
+        """)
+        self.remoter.sudo('bash -cxe "%s"' % setup_script)
 
     @retrying(n=3, sleep_time=10, allowed_exceptions=(AssertionError,), message="Retrying on getting scylla repo")
     def download_scylla_repo(self, scylla_repo):
@@ -2493,6 +2469,8 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
         peers_details = {}
         for line in cql_result[3:-2]:
             line_splitted = line.split('|')
+            if len(line_splitted) < 8:
+                continue
             peers_details[line_splitted[0].strip()] = {'data_center': line_splitted[1].strip(),
                                                        'host_id': line_splitted[2].strip(),
                                                        'rack': line_splitted[3].strip(),
@@ -2687,6 +2665,7 @@ class BaseCluster:  # pylint: disable=too-many-instance-attributes,too-many-publ
     """
     Cluster of Node objects.
     """
+    _shorten_name = False
 
     # pylint: disable=too-many-arguments
     def __init__(self, cluster_uuid=None, cluster_prefix='cluster', node_prefix='node', n_nodes=3, params=None,
@@ -2729,6 +2708,91 @@ class BaseCluster:  # pylint: disable=too-many-instance-attributes,too-many-publ
             raise ValueError('Unsupported type: {}'.format(type(n_nodes)))
         self.coredumps = dict()
         super(BaseCluster, self).__init__()
+
+    def _shorten_alpha_sequences(self, value: str, max_alpha_chunk_size: int) -> str:
+        if not value:
+            return value
+        is_alpha = value[0].isalpha()
+        num = 0
+        output = ''
+        for char in value:
+            if is_alpha == char.isalpha():
+                if is_alpha and num >= max_alpha_chunk_size:
+                    continue
+                num += 1
+                output += char
+                continue
+            output += char
+            num = 1
+        return output
+
+    def _shorten_string(self, value: Union[str, List[str]], max_alpha_chunk_size: int) -> str:
+        chunks = []
+        if isinstance(value, str):
+            tmp = value.split('-')
+        else:
+            tmp = value
+        for chunk in tmp:
+            chunks.append(self._shorten_alpha_sequences(chunk, max_alpha_chunk_size))
+        return '-'.join(chunks)
+
+    def _shorten_cluster_name(self, name: str, max_string_len: int):
+        max_alpha_chunk_size = 4
+        last_chunk = name.split('-')[-1]
+        current = '-'.join(name.split('-')[0:-1])
+        last_chunk_len = len(last_chunk)
+        while len(current) + last_chunk_len + 1 > max_string_len and max_alpha_chunk_size > 0:
+            current = self._shorten_string(name.split('-')[0:-1], max_alpha_chunk_size)
+            max_alpha_chunk_size -= 1
+        if max_alpha_chunk_size == 0:
+            self.log.info('Failed to make cluster name {name} shorter, use original value')
+            return name
+        return '-'.join([current, last_chunk])
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, value: str):
+        if self._shorten_name:
+            self._name = self._shorten_cluster_name(value, 39)
+        else:
+            self._name = value
+
+    def is_scylla_encryption_options_enabled(self, params) -> bool:
+        if params is None:
+            params = self.params
+        return params.get('scylla_encryption_options', '')
+
+    def is_client_encryption_enabled(self, params=None) -> bool:
+        if params is None:
+            params = self.params
+        return params.get('client_encrypt', '')
+
+    def is_server_encryption_enabled(self, params=None) -> bool:
+        if params is None:
+            params = self.params
+        return params.get('server_encrypt', '')
+
+    def is_internode_encryption_enabled(self, params=None) -> bool:
+        if params is None:
+            params = self.params
+        return params.get('internode_encryption', '')
+
+    def is_system_encryption_enabled(self, params=None, append_scylla_yaml=None) -> bool:
+        if params is None:
+            params = self.params
+        if append_scylla_yaml is None:
+            append_scylla_yaml = params.get('append_scylla_yaml', '')
+        return 'system_info_encryption' in append_scylla_yaml
+
+    def is_kmip_enabled(self, params=None, append_scylla_yaml=None) -> bool:
+        if params is None:
+            params = self.params
+        if append_scylla_yaml is None:
+            append_scylla_yaml = params.get('append_scylla_yaml', '')
+        return 'kmip_hosts:' in append_scylla_yaml
 
     @cached_property
     def tags(self) -> Dict[str, str]:
@@ -3334,6 +3398,12 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
                 node_list = self.nodes
             self._update_db_packages(new_scylla_bin, node_list)
 
+    def get_docker_repo_from_scylla_version(self, version: str) -> str:
+        first_chunk = version.split('.')[0]
+        if first_chunk.startswith('20') and len(first_chunk) == 4:
+            return 'scylladb/scylla-enterprise'
+        return 'scylladb/scylla'
+
     def get_node_info_list(self, verification_node):
         """
             !!! Deprecated !!!!
@@ -3608,23 +3678,15 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         self.nemesis_threads = []
 
     def node_config_setup(self, node, seed_address=None, endpoint_snitch=None, murmur3_partitioner_ignore_msb_bits=None, client_encrypt=None):  # pylint: disable=too-many-arguments,invalid-name
-        node.config_setup(seed_address=seed_address,
-                          cluster_name=self.name,  # pylint: disable=no-member
-                          enable_exp=self.params.get('experimental'),
-                          endpoint_snitch=endpoint_snitch,
-                          authenticator=self.params.get('authenticator'),
-                          server_encrypt=self.params.get('server_encrypt'),
-                          client_encrypt=client_encrypt if client_encrypt is not None else self.params.get(
-                              'client_encrypt'),
-                          append_scylla_yaml=self.params.get('append_scylla_yaml'),
-                          append_scylla_args=self.get_scylla_args(),
-                          hinted_handoff=self.params.get('hinted_handoff'),
-                          authorizer=self.params.get('authorizer'),
-                          alternator_port=self.params.get('alternator_port'),
-                          murmur3_partitioner_ignore_msb_bits=murmur3_partitioner_ignore_msb_bits,
-                          alternator_enforce_authorization=self.params.get('alternator_enforce_authorization'),
-                          internode_compression=self.params.get('internode_compression'),
-                          internode_encryption=self.params.get('internode_encryption'))
+        node.config_setup(**get_config_from_params(
+            name=self.name,
+            params=self.params,
+            seed_address=seed_address,
+            endpoint_snitch=endpoint_snitch,
+            murmur3_partitioner_ignore_msb_bits=murmur3_partitioner_ignore_msb_bits,
+            client_encrypt=client_encrypt,
+            append_scylla_args=self.get_scylla_args()
+        ))
 
     def node_setup(self, node: BaseNode, verbose: bool = False, timeout: int = 3600):  # pylint: disable=too-many-branches
         node.wait_ssh_up(verbose=verbose, timeout=timeout)
@@ -3661,19 +3723,7 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
             node.remoter.sudo('cat /etc/scylla.d/io.conf')
 
             if self.params.get('use_mgmt', None):
-                pkgs_url = self.params.get('scylla_mgmt_pkg', None)
-                pkg_path = None
-                if pkgs_url:
-                    pkg_path = download_dir_from_cloud(pkgs_url)
-                    node.remoter.run('mkdir -p {}'.format(pkg_path))
-                    node.remoter.send_files(src='{}*.rpm'.format(pkg_path), dst=pkg_path)
-                node.install_manager_agent(package_path=pkg_path)
-                cluster_backend = self.params.get("cluster_backend")
-                if cluster_backend == "aws":
-                    region = self.params.get('region_name').split()
-                    update_config_file(node=node, region=region[0])
-                else:
-                    self.log.warning("Backend '%s' not support. Won't configure manager backups!", cluster_backend)
+                self.install_manager_agent(node, self.params.get('scylla_mgmt_pkg', None))
         else:
             self._reuse_cluster_setup(node)
 
@@ -3682,6 +3732,20 @@ class BaseScyllaCluster:  # pylint: disable=too-many-public-methods, too-many-in
         check_nodes_status(nodes_status=nodes_status, current_node=node)
 
         self.clean_replacement_node_ip(node)
+
+    def install_manager_agent(self, node, pkgs_url):
+        pkg_path = None
+        if pkgs_url:
+            pkg_path = download_dir_from_cloud(pkgs_url)
+            node.remoter.run('mkdir -p {}'.format(pkg_path))
+            node.remoter.send_files(src='{}*.rpm'.format(pkg_path), dst=pkg_path)
+        node.install_manager_agent(package_path=pkg_path)
+        cluster_backend = self.params.get("cluster_backend")
+        if cluster_backend == "aws":
+            region = self.params.get('region_name').split()
+            update_config_file(node=node, region=region[0])
+        else:
+            self.log.warning("Backend '%s' not support. Won't configure manager backups!", cluster_backend)
 
     def _scylla_install(self, node):
         node.update_repo_cache()
@@ -3944,7 +4008,8 @@ class BaseLoaderSet():
         collectd_setup.install(node)
         self.install_gemini(node=node)
         if self.params.get('client_encrypt'):
-            node.config_client_encrypt()
+            node.prepare_cqlsh_for_client_encryption()
+            node.prepare_client_encryption()
 
         result = node.remoter.run('test -e ~/PREPARED-LOADER', ignore_status=True)
         node.remoter.sudo("bash -cxe \"echo '*\t\thard\tcore\t\tunlimited\n*\t\tsoft\tcore\t\tunlimited' "

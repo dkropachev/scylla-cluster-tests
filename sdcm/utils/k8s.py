@@ -89,11 +89,12 @@ class KubernetesOps:
         return " ".join(cmd)
 
     @classmethod
-    def kubectl(cls, kluster, *command, namespace=None, timeout=KUBECTL_TIMEOUT, remoter=None):
+    def kubectl(cls, kluster, *command, namespace=None, timeout=KUBECTL_TIMEOUT, remoter=None,
+                ignore_status: bool = False, verbose: bool = True):
         cmd = cls.kubectl_cmd(kluster, *command, namespace=namespace, ignore_k8s_server_url=bool(remoter))
         if remoter is None:
             remoter = LOCALRUNNER
-        return remoter.run(cmd, timeout=timeout)
+        return remoter.run(cmd, timeout=timeout, ignore_status=ignore_status, verbose=verbose)
 
     @classmethod
     def apply_file(cls, kluster, config_path, namespace=None, timeout=KUBECTL_TIMEOUT, envsubst=True):
