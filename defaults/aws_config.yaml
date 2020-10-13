@@ -7,7 +7,7 @@ instance_type_loader: 'c5.xlarge'
 instance_type_monitor: 't3.large'
 regions_data:
   us-east-1: # US East (N. Virginia)
-    ami_id_loader: 'ami-08516c9b78d5d6d1e' # Loader dedicated AMI v16
+    ami_id_loader: 'ami-0763f2a0a800ac9e5' # Loader dedicated AMI v16
     ami_id_monitor: 'ami-02eac2c0129f6376b' # Official CentOS Linux 7 x86_64 HVM EBS ENA 1901_01
     backup_bucket_location: 'manager-backup-tests-us-east-1'
   us-west-2: # US West (Oregon)
