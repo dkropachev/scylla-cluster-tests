@@ -3173,7 +3173,7 @@ class KubernetesScyllaOperatorMonkey(Nemesis):
 
     def __init__(self, *args, **kwargs):
         super(KubernetesScyllaOperatorMonkey, self).__init__(*args, **kwargs)
-        self.disrupt_methods_list = self.get_list_of_methods_compatible_with_backend()
+        self.disrupt_methods_list = self.get_list_of_methods_compatible_with_backend(disruptive=True)
 
     @log_time_elapsed_and_status
     def disrupt(self):

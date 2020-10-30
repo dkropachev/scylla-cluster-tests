@@ -74,6 +74,8 @@ from sdcm.utils.remote_logger import get_system_logging_thread
 from sdcm.utils.scylla_args import ScyllaArgParser
 from sdcm.utils.file import File
 from sdcm.coredump import CoredumpExportSystemdThread
+from sdcm.utils.tcpdump_thread import TCPDumpThread
+
 
 
 CREDENTIALS = []
@@ -967,6 +969,7 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
         if self.node_type == 'db':
             self.start_coredump_thread()
             self.start_db_log_reader_thread()
+            TCPDumpThread(node=self).start()
         elif self.node_type == 'loader':
             self.start_coredump_thread()
         elif self.node_type == 'monitor':
