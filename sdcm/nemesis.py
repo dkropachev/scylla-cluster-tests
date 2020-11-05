@@ -2509,7 +2509,7 @@ class SslHotReloadingNemesis(Nemesis):
 
 
 class NoOpMonkey(Nemesis):
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2518,7 +2518,7 @@ class NoOpMonkey(Nemesis):
 
 class GrowShrinkClusterNemesis(Nemesis):
     disruptive = True
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2581,7 +2581,7 @@ class SoftRebootNodeMonkey(Nemesis):
 
 class DrainerMonkey(Nemesis):
     disruptive = True
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2590,7 +2590,7 @@ class DrainerMonkey(Nemesis):
 
 class CorruptThenRepairMonkey(Nemesis):
     disruptive = True
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2599,7 +2599,7 @@ class CorruptThenRepairMonkey(Nemesis):
 
 class CorruptThenRebuildMonkey(Nemesis):
     disruptive = True
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2633,7 +2633,7 @@ class NoCorruptRepairMonkey(Nemesis):
 
 class MajorCompactionMonkey(Nemesis):
     disruptive = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2643,7 +2643,7 @@ class MajorCompactionMonkey(Nemesis):
 class RefreshMonkey(Nemesis):
     disruptive = False
     run_with_gemini = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2653,7 +2653,7 @@ class RefreshMonkey(Nemesis):
 class RefreshBigMonkey(Nemesis):
     disruptive = False
     run_with_gemini = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2662,7 +2662,7 @@ class RefreshBigMonkey(Nemesis):
 
 class EnospcMonkey(Nemesis):
     disruptive = True
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2671,7 +2671,7 @@ class EnospcMonkey(Nemesis):
 
 class EnospcAllNodesMonkey(Nemesis):
     disruptive = True
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2689,7 +2689,7 @@ class NodeToolCleanupMonkey(Nemesis):
 
 class TruncateMonkey(Nemesis):
     disruptive = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2698,7 +2698,7 @@ class TruncateMonkey(Nemesis):
 
 class TruncateLargeParititionMonkey(Nemesis):
     disruptive = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2707,7 +2707,7 @@ class TruncateLargeParititionMonkey(Nemesis):
 
 class DeleteByPartitionsMonkey(Nemesis):
     disruptive = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2716,7 +2716,7 @@ class DeleteByPartitionsMonkey(Nemesis):
 
 class DeleteByRowsRangeMonkey(Nemesis):
     disruptive = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2917,7 +2917,7 @@ class RollbackNemesis(Nemesis):
 
 class ModifyTableMonkey(Nemesis):
     disruptive = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2928,7 +2928,7 @@ class AddDropColumnMonkey(Nemesis):
     disruptive = False
     run_with_gemini = False
     networking = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2936,7 +2936,7 @@ class AddDropColumnMonkey(Nemesis):
 
 
 class ToggleTableIcsMonkey(Nemesis):
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2990,7 +2990,7 @@ class ScyllaKillMonkey(Nemesis):
 
 class ValidateHintedHandoffShortDowntime(Nemesis):
     disruptive = True
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -2999,7 +2999,7 @@ class ValidateHintedHandoffShortDowntime(Nemesis):
 
 class SnapshotOperations(Nemesis):
     disruptive = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
@@ -3017,7 +3017,7 @@ class NodeRestartWithResharding(Nemesis):
 
 class TopPartitions(Nemesis):
     disruptive = False
-    kubernetes = True
+    kubernetes = False
 
     @log_time_elapsed_and_status
     def disrupt(self):
