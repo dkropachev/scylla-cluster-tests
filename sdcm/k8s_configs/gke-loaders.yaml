@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: cassandra-stress
-          image: scylladb/scylla:${SCT_SCYLLA_VERSION}
+          image: scylladb/scylla:4.3.rc1
           command:
             - "/bin/cat"
           tty: true
