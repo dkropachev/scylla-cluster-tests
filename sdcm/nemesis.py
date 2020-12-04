@@ -268,7 +268,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         for subclass in subclasses_list:
             method_name = re.search(
                 r'self\.(?P<method_name>disrupt_[A-Za-z_]+?)\(.*\)', inspect.getsource(subclass), flags=re.MULTILINE)
-            if method_name:
+            if method_name and method_name != 'call_random_disrupt_method':
                 disrupt_methods_list.append(method_name.group('method_name'))
         self.log.debug("Gathered subclass methods: {}".format(disrupt_methods_list))
         return disrupt_methods_list
