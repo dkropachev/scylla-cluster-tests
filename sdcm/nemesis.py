@@ -821,30 +821,28 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self.log.warning("No monkey to run")
             return
         if not predefined_sequence:
-            disrupt_method = random.choice(disrupt_methods)
-        else:
-            if not self._random_sequence:
-                # Generate random sequence, every method has same chance to be called.
-                # Here we use multiple original methods list, it will increase the chance
-                # to call same method continuously.
-                #
-                # Adjust the rate according to the test duration. Try to call more unique
-                # methods and don't wait to long time to meet the balance if the test
-                # duration is short.
-                test_duration = self.cluster.params.get('test_duration')
-                if test_duration < 600:  # less than 10 hours
-                    rate = 1
-                elif test_duration < 4320:  # less than 3 days
-                    rate = 2
-                else:
-                    rate = 3
-                multiple_disrupt_methods = disrupt_methods * rate
-                random.shuffle(multiple_disrupt_methods)
-                self._random_sequence = multiple_disrupt_methods
-            # consume the random sequence
-            disrupt_method = self._random_sequence.pop()
-
-        self.execute_disrupt_method(disrupt_method)
+            self.execute_disrupt_method(random.choice(disrupt_methods))
+            return
+        if not self._random_sequence:
+            # Generate random sequence, every method has same chance to be called.
+            # Here we use multiple original methods list, it will increase the chance
+            # to call same method continuously.
+            #
+            # Adjust the rate according to the test duration. Try to call more unique
+            # methods and don't wait to long time to meet the balance if the test
+            # duration is short.
+            test_duration = self.cluster.params.get('test_duration')
+            if test_duration < 600:  # less than 10 hours
+                rate = 1
+            elif test_duration < 4320:  # less than 3 days
+                rate = 2
+            else:
+                rate = 3
+            multiple_disrupt_methods = disrupt_methods * rate
+            random.shuffle(multiple_disrupt_methods)
+            self._random_sequence = multiple_disrupt_methods
+        # consume the random sequence
+        self.execute_disrupt_method(self._random_sequence.pop())
 
     def execute_disrupt_method(self, disrupt_method):
         disrupt_method_name = disrupt_method.__name__.replace('disrupt_', '')
