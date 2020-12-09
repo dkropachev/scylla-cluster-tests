@@ -573,6 +573,8 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
 
         last_events, events_summary = self.get_events()
 
+        ebs = doc["_source"]["setup_details"].get("data_device")
+        ebs_type = doc["_source"]["setup_details"].get("aws_ebs_volume_type") if ebs == "attached" else None
         results = dict(test_name=full_test_name,
                        test_start_time=str(test_start_time),
                        test_version=test_version_info,
@@ -595,6 +597,8 @@ class PerformanceResultsAnalyzer(BaseResultsAnalyzer):
         subject = f'Performance Regression Compare Results - {test_name} - {test_version} - {str(test_start_time)}'
         if ycsb:
             subject = f'(Alternator) Performance Regression - {test_name} - {test_version} - {str(test_start_time)}'
+        if ebs:
+            subject = f'{subject} (ebs volume type {ebs_type})'
         if email_subject_postfix:
             subject = f'{subject} {email_subject_postfix}'
         html = self.render_to_html(results)

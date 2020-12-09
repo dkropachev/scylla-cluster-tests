@@ -1128,7 +1128,29 @@ class SCTConfiguration(dict):
              help="Limit severity level for event types"),
 
         dict(name="scylla_rsyslog_setup", env="SCT_SCYLLA_RSYSLOG_SETUP", type=boolean,
-             help="Configure rsyslog on Scylla nodes to send logs to monitoring nodes")
+             help="Configure rsyslog on Scylla nodes to send logs to monitoring nodes"),
+
+        dict(name="data_device", env="SCT_DATA_DEVICE", type=str,
+             help="""Define which device to use for scylla data. Default for gce is attached. Default for aws is instance_store.
+                     attached - means use additionaly attached devices
+                     instance_store - means use emphereal local NVMes devices(AWS)""",
+             choices=("attached", "instance_store")),
+
+        dict(name="aws_ebs_volume_num", env="SCT_AWS_EBS_VOLUME_NUM",
+             type=int,
+             help="Number of additional ebs volumes attached to instances"),
+
+        dict(name="aws_ebs_volume_type", env="SCT_AWS_EBS_VOLUME_TYPE",
+             type=str,
+             help="Type of addtitional volumes: gp2|gp3|io2|io3"),
+
+        dict(name="aws_ebs_volume_size", env="SCT_AWS_EBS_VOLUME_SIZE",
+             type=int,
+             help="Size of additional volume in GB"),
+
+        dict(name="aws_ebs_volume_iops", env="SCT_AWS_EBS_VOLUME_IOPS",
+             type=int,
+             help="Number of iops for ebs type io2|io3|gp3"),
     ]
 
     required_params = ['cluster_backend', 'test_duration', 'n_db_nodes', 'n_loaders', 'use_preinstalled_scylla',
@@ -1534,6 +1556,10 @@ class SCTConfiguration(dict):
         self._check_per_backend_required_values(backend)
         if backend in ['aws']:
             self._check_aws_multi_region_params()
+
+        # verify that correct configuration set for using ebs-storage
+        self._verfiy_ebs_volumes_configuration(backend)
+
         self._validate_seeds_number()
         if 'extra_network_interface' in self and len(self.region_names) >= 2:
             raise ValueError("extra_network_interface isn't supported for multi region use cases")
@@ -1639,7 +1665,6 @@ class SCTConfiguration(dict):
                         assert 'user_data_format_version' in tags.keys(), \
                             f"\n\t'user_data_format_version' tag missing from [{ami_id}] on {region_name}\n\texisting " \
                             f"tags: {tags}"
-
         # For each Scylla repo file we will check that there is at least one valid URL through which to download a
         # version of SCYLLA, otherwise we will get an error.
         get_branch_version_for_multiple_repositories(urls=(self.get(url) for url in [
@@ -1705,6 +1730,13 @@ class SCTConfiguration(dict):
             ret += "{help_text}{name}: {default}\n\n".format(help_text=help_text, default=default, **opt)
 
         return ret
+
+    def _verfiy_ebs_volumes_configuration(self, backend):
+        if backend in ['aws']:
+            device_type = self.get("data_device")
+            dev_num = self.get("aws_ebs_volume_num")
+            if dev_num < 1 and device_type == "attached":
+                raise ValueError("Wrong configuration for ebs volume usage")
 
 
 def init_and_verify_sct_config() -> SCTConfiguration:

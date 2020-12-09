@@ -2044,7 +2044,7 @@ class ClusterTester(db_stats.TestStatsMixin,
                                            values=', '.join(['?' for _ in columns])))
 
             # Save all rows
-            # Workers = Parallel queries = (nodes in cluster) ✕ (cores in node) ✕ 3
+            # Workers = Parallel queries = (nodes in cluster) x (cores in node) x 3
             # (from https://www.scylladb.com/2017/02/13/efficient-full-table-scans-with-scylla-1-6/)
             cores = self.db_cluster.nodes[0].cpu_cores
             if not cores:
@@ -2712,8 +2712,14 @@ class ClusterTester(db_stats.TestStatsMixin,
         This function will run fstrim command all db nodes in the cluster to clear any bad state of the disks.
         :return:
         """
+        # if used ebs volumes with aws backend fstrim is not supported
+        # fstrim: /var/lib/scylla: the discard operation is not supported
+        if self.db_cluster.is_ebs_volumes_attached():
+            self.log.info("fstrim is not supported on aws ebs volumes")
+            return
+
         for node in self.db_cluster.nodes:
-            node.fstrim_scylla_disks()
+            node.remoter.sudo('fstrim -v /var/lib/scylla')
 
     @silence()
     def collect_logs(self) -> None:
