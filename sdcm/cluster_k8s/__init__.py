@@ -82,17 +82,20 @@ class KubernetesCluster:
     def kubectl(self, *command, namespace=None, timeout=KUBECTL_TIMEOUT, remoter=None):
         if self.api_call_rate_limiter:
             self.api_call_rate_limiter.wait()
+            self.api_call_rate_limiter.wait_api_is_till_stable(self)
         return KubernetesOps.kubectl(self, *command, namespace=namespace, timeout=timeout, remoter=remoter)
 
     def kubectl_multi_cmd(self, *command, namespace=None, timeout=KUBECTL_TIMEOUT, remoter=None):
         if self.api_call_rate_limiter:
             self.api_call_rate_limiter.wait()
+            self.api_call_rate_limiter.wait_api_is_till_stable(self)
         return KubernetesOps.kubectl_multi_cmd(self, *command, namespace=namespace, timeout=timeout, remoter=remoter)
 
     @cached_property
     def helm(self):
         if self.api_call_rate_limiter:
             self.api_call_rate_limiter.wait()
+            self.api_call_rate_limiter.wait_api_is_till_stable(self)
         return partial(cluster.Setup.tester_obj().localhost.helm, self)
 
     @property

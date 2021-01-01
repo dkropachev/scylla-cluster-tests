@@ -19,7 +19,6 @@ import queue
 import logging
 import threading
 import multiprocessing
-import contextlib
 from typing import Optional
 from functools import cached_property
 
@@ -52,7 +51,14 @@ class ApiLimiterClient(k8s.client.ApiClient):
     def call_api(self, *args, **kwargs):
         if self._api_rate_limiter:
             self._api_rate_limiter.wait()
-        return super().call_api(*args, **kwargs)
+        if not self._api_rate_limiter.is_unstable():
+            return super().call_api(*args, **kwargs)
+        while True:
+            try:
+                return super().call_api(*args, **kwargs)
+            except Exception:
+                if not self._api_rate_limiter.is_unstable():
+                    raise
 
     def bind_api_limiter(self, instance: 'ApiCallRateLimiter'):
         self._api_rate_limiter = instance
@@ -86,28 +92,56 @@ class ApiCallRateLimiter(threading.Thread):
     def __init__(self, rate_limit: float, queue_size: int, urllib_retry: int):
         super().__init__(name=type(self).__name__, daemon=True)
         self._lock = multiprocessing.Semaphore(value=1)
-        self._requests_pause_event = multiprocessing.Event()
-        self.release_requests_pause()
         self.rate_limit = rate_limit  # ops/s
         self.queue_size = queue_size
         self.urllib_retry = urllib_retry
         self.running = threading.Event()
+        self._unstable_end_date = multiprocessing.Value('d', 0.0)
+        self._unstable_passed = multiprocessing.Value('i', 0)
+        self._unstable_lock = multiprocessing.Lock()
 
-    def put_requests_on_pause(self):
-        self._requests_pause_event.clear()
+    def set_unstable(self, period):
+        self._unstable_end_date.value = time.time() + period
+        self._unstable_passed.value = 0
 
-    def release_requests_pause(self):
-        self._requests_pause_event.set()
+    def set_stable(self):
+        self._unstable_end_date.value = None
 
-    @property
-    @contextlib.contextmanager
-    def pause(self):
-        self.put_requests_on_pause()
-        yield None
-        self.release_requests_pause()
+    def passed_stability_test(self):
+        self._unstable_passed.value += 1
+        if self._unstable_passed.value > 20:
+            # Mark it as stable
+            self._unstable_end_date.value = None
+
+    def is_unstable(self):
+        return self._unstable_end_date.value and time.time() <= self._unstable_end_date.value
+
+    def wait_api_is_till_stable(self, kluster, num_requests=20, max_waiting_time=1200):
+        if not self.is_unstable():
+            return True
+        with self._unstable_lock:
+            if not self.is_unstable():
+                return True
+            logging.getLogger('urllib3.connectionpool').disabled = True
+            end_time = time.perf_counter() + max_waiting_time
+            while end_time >= time.perf_counter():
+                try:
+                    for n in range(num_requests):
+                        KubernetesOps.core_v1_api(
+                            KubernetesOps.api_client(self.get_k8s_configuration(kluster))
+                        ).list_pod_for_all_namespaces(watch=False)
+                        time.sleep(1/self.rate_limit)
+                    self.passed_stability_test()
+                    LOGGER.debug('GKE API passed stability test %s', self._unstable_passed.value)
+                    logging.getLogger('urllib3.connectionpool').disabled = False
+                    return True
+                except Exception:
+                    pass
+            logging.getLogger('urllib3.connectionpool').disabled = False
+            LOGGER.error('Failed to wait %s seconds for API to stabilize', max_waiting_time)
+            return False
 
     def wait(self):
-        self._requests_pause_event.wait(15 * 60)
         if not self._lock.acquire(timeout=self.queue_size / self.rate_limit):  # deepcode ignore E1123: deepcode error
             LOGGER.error("k8s API call rate limiter queue size limit has been reached")
             raise queue.Full
