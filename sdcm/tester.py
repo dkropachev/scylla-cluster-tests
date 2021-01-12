@@ -920,6 +920,10 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         self.k8s_cluster.wait_for_init()
         self.k8s_cluster.deploy_cert_manager()
         self.k8s_cluster.deploy_scylla_operator()
+        if self.params.get('k8s_deploy_monitoring'):
+            self.k8s_cluster.deploy_monitoring_cluster(
+                self.params.get('k8s_scylla_operator_docker_image').split(':')[1]
+            )
 
         # This should remove some of the unpredictability of pods startup time.
         self.k8s_cluster.docker_pull(f"{self.params.get('docker_image')}:{self.params.get('scylla_version')}")
@@ -989,6 +993,13 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
         self.k8s_cluster.wait_for_init()
         self.k8s_cluster.deploy_cert_manager()
         self.k8s_cluster.deploy_scylla_operator()
+        if self.params.get('k8s_deploy_monitoring'):
+            self.k8s_cluster.add_gke_pool(name="monitoring",
+                                          num_nodes=1,
+                                          instance_type=self.params.get("gce_instance_type_monitor"))
+            self.k8s_cluster.deploy_monitoring_cluster(
+                self.params.get('k8s_scylla_operator_docker_image').split(':')[1]
+            )
 
         self.db_cluster = gke.GkeScyllaPodCluster(k8s_cluster=self.k8s_cluster,
                                                   scylla_cluster_config=gke.SCYLLA_CLUSTER_CONFIG,
