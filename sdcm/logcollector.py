@@ -867,6 +867,8 @@ class LoaderLogCollector(LogCollector):
         FileLog(name='system.log',
                 command="sudo journalctl --no-tail --no-pager",
                 search_locally=True),
+        FileLog(name='*.hdr',
+                search_locally=True),
         FileLog(name='*cassandra-stress*.log',
                 search_locally=True),
         FileLog(name='*ycsb*.log',

@@ -248,6 +248,9 @@ class SCTConfiguration(dict):
         dict(name="use_cloud_manager", env="SCT_USE_CLOUD_MANAGER", type=boolean,
              help="When define true, will install scylla cloud manager"),
 
+        dict(name="cs_dump_hdr", env="SCT_CS_DUMP_HDR", type=boolean,
+             help="When define true, cassandra-stress will store hdrfiles"),
+
         dict(name="use_ldap_authorization", env="SCT_USE_LDAP_AUTHORIZATION", type=boolean,
              help="When defined true, will create a docker container with LDAP and configure scylla.yaml to use it"),
 

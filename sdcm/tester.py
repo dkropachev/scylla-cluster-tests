@@ -1122,7 +1122,9 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
                                           round_robin=round_robin,
                                           client_encrypt=self.db_cluster.nodes[0].is_client_encrypt,
                                           keyspace_name=keyspace_name,
-                                          stop_test_on_failure=stop_test_on_failure).run()
+                                          stop_test_on_failure=stop_test_on_failure,
+                                          dump_hdr=self.params.get('cs_dump_hdr'),
+                                          ).run()
         scylla_encryption_options = self.params.get('scylla_encryption_options')
         if scylla_encryption_options and 'write' in stress_cmd:
             # Configure encryption at-rest for all test tables, sleep a while to wait the workload starts and test tables are created

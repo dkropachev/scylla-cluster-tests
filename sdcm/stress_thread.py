@@ -62,7 +62,8 @@ class CassandraStressEventsPublisher(FileFollowerThread):
 
 class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
     def __init__(self, loader_set, stress_cmd, timeout, stress_num=1, keyspace_num=1, keyspace_name='',  # pylint: disable=too-many-arguments
-                 profile=None, node_list=None, round_robin=False, client_encrypt=False, stop_test_on_failure=True):
+                 profile=None, node_list=None, round_robin=False, client_encrypt=False, stop_test_on_failure=True,
+                 dump_hdr=False):
         if not node_list:
             node_list = []
         self.loader_set = loader_set
@@ -76,14 +77,29 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
         self.round_robin = round_robin
         self.client_encrypt = client_encrypt
         self.stop_test_on_failure = stop_test_on_failure
-
+        self.dump_hdr = dump_hdr
         self.executor = None
         self.results_futures = []
         self.shell_marker = generate_random_string(20)
         #  This marker is used to mark shell commands, in order to be able to kill them later
         self.max_workers = 0
 
-    def create_stress_cmd(self, node, loader_idx, keyspace_idx):
+    def generate_uuid(self):
+        return uuid.uuid4()
+
+    def _loader_hdr_file_path(self, loader_idx, cpu_idx, keyspace_idx, run_uid):
+        return os.path.join('/tmp', self._log_file_name(loader_idx, cpu_idx, keyspace_idx, run_uid) + '.hdr')
+
+    def _sct_hdr_file_path(self, node, loader_idx, cpu_idx, keyspace_idx, run_uid):
+        return os.path.join(node.logdir, self._log_file_name(loader_idx, cpu_idx, keyspace_idx, run_uid) + '.hdr')
+
+    def _log_file_name(self, loader_idx, cpu_idx, keyspace_idx, run_uid):
+        return f'cassandra-stress-l{loader_idx}-c{cpu_idx}-k{keyspace_idx}-{run_uid}'
+
+    def _log_file_path(self, node, loader_idx, cpu_idx, keyspace_idx, run_uid):
+        return os.path.join(node.logdir, self._log_file_name(loader_idx, cpu_idx, keyspace_idx, run_uid) + '.log')
+
+    def create_stress_cmd(self, node, loader_idx, cpu_idx, keyspace_idx, run_uid):
         stress_cmd = self.stress_cmd
         if node.cassandra_stress_version == "unknown":  # Prior to 3.11, cassandra-stress didn't have version argument
             stress_cmd = stress_cmd.replace("throttle", "limit")  # after 3.11 limit was renamed to throttle
@@ -117,7 +133,26 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
             stress_cmd += " -node {}".format(first_node.ip_address)
         if 'skip-unsupported-columns' in self._get_available_suboptions(node, '-errors'):
             stress_cmd = self._add_errors_option(stress_cmd, ['skip-unsupported-columns'])
+        if self.dump_hdr:
+            stress_cmd = self._add_log_option(
+                stress_cmd, [f'hdrfile={self._loader_hdr_file_path(loader_idx, cpu_idx, keyspace_idx, run_uid)}'])
         return stress_cmd
+
+    @staticmethod
+    def _add_log_option(stress_cmd: str, to_add: list) -> str:
+        """
+        Add suboption to -log option, if such suboption is there, does not add or change it
+        """
+        to_add = list(to_add)
+        current_log_options = next((option for option in stress_cmd.split(' -') if option.startswith('log ')), None)
+        if current_log_options is None:
+            return f"{stress_cmd} -log {' '.join(to_add)}"
+        current_log_suboptions = current_log_options.split()[1:]
+        new_log_options = \
+            list({suboption.split('=', 1)[0]: suboption for suboption in to_add + current_log_suboptions}.values())
+        if len(new_log_options) == len(current_log_suboptions):
+            return stress_cmd
+        return stress_cmd.replace(current_log_options, 'log ' + ' '.join(new_log_options))
 
     @staticmethod
     def _add_errors_option(stress_cmd: str, to_add: list) -> str:
@@ -146,7 +181,8 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
         return re.findall(r' *\[([\w-]+?)[=?]*] *', result)
 
     def _run_stress(self, node, loader_idx, cpu_idx, keyspace_idx):  # pylint: disable=too-many-locals
-        stress_cmd = self.create_stress_cmd(node, loader_idx, keyspace_idx)
+        run_uid = self.generate_uuid()
+        stress_cmd = self.create_stress_cmd(node, loader_idx, cpu_idx, keyspace_idx, run_uid)
 
         if self.profile:
             with open(self.profile) as profile_file:
@@ -160,8 +196,7 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
         LOGGER.info('Stress command:\n%s', stress_cmd)
 
         os.makedirs(node.logdir, exist_ok=True)
-        log_file_name = \
-            os.path.join(node.logdir, f'cassandra-stress-l{loader_idx}-c{cpu_idx}-k{keyspace_idx}-{uuid.uuid4()}.log')
+        log_file_name = self._log_file_path(node, loader_idx, cpu_idx, keyspace_idx, run_uid)
 
         LOGGER.debug('cassandra-stress local log: %s', log_file_name)
 
@@ -192,6 +227,18 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
                            stress_cmd=stress_cmd,
                            log_file_name=log_file_name,
                            errors=[format_stress_cmd_error(exc), ]).publish()
+            finally:
+                if self.dump_hdr:
+                    try:
+                        node.remoter.receive_files(
+                            self._loader_hdr_file_path(loader_idx, cpu_idx, keyspace_idx, run_uid),
+                            self._sct_hdr_file_path(node, loader_idx, cpu_idx, keyspace_idx, run_uid)
+                        )
+                    except Exception as exc:
+                        LOGGER.error(
+                            'Failed to upload hdr file %s from %s due to the %s',
+                            self._loader_hdr_file_path(loader_idx, cpu_idx, keyspace_idx, run_uid), node, exc)
+
         CassandraStressEvent.finish(node=node, stress_cmd=stress_cmd, log_file_name=log_file_name).publish()
 
         return node, result
