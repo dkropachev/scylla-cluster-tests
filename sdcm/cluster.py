@@ -4449,7 +4449,6 @@ class BaseLoaderSet():
                 self.install_scylla_bench(node)
                 self.log.debug('Skip loader setup for using a prepared AMI')
                 return
-
         if node.is_ubuntu14():
             install_java_script = dedent("""
                 apt-get install software-properties-common -y

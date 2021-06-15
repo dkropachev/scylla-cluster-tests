@@ -7,7 +7,7 @@ import time
 
 from botocore.exceptions import ClientError
 
-from sdcm.utils.decorators import retrying
+from sdcm.utils.decorators import retrying, timeout
 from sdcm.utils.prepare_region import AwsRegion
 from sdcm.wait import wait_for
 
