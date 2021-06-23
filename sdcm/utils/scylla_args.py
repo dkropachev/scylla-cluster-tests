@@ -48,7 +48,10 @@ class ScyllaArgParser(argparse.ArgumentParser):
     def from_scylla_help(cls, help: Text) -> "ScyllaArgParser":
         parser = cls(prog="scylla")
         for *args, val in SCYLLA_ARG.findall(help):
-            parser.add_argument(*filter(bool, args), action="store" if val else "store_false")
+            try:
+                parser.add_argument(*filter(bool, args), action="store" if val else "store_false")
+            except argparse.ArgumentError:
+                pass
         return parser
 
     def filter_args(self, args: str) -> str:
