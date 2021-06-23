@@ -50,6 +50,9 @@ CDCReaderStressEvent.finish: NORMAL
 KclStressEvent.failure: ERROR
 KclStressEvent.start: NORMAL
 KclStressEvent.finish: NORMAL
+NoSQLBenchStressEvent.failure: ERROR
+NoSQLBenchStressEvent.start: NORMAL
+NoSQLBenchStressEvent.finish: NORMAL
 CassandraStressLogEvent.IOException: ERROR
 CassandraStressLogEvent.ConsistencyError: ERROR
 CassandraStressLogEvent.OperationOnKey: CRITICAL
