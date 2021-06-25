@@ -22,6 +22,6 @@ email_recipients: ['d.kropachev@scylladb.com']
 
 data_device: 'attached'
 aws_ebs_volume_num: 1
-aws_ebs_volume_type: "gp2"
+aws_ebs_volume_type: "gp3"
 aws_ebs_volume_size: 3072
 aws_ebs_volume_iops: 16000
