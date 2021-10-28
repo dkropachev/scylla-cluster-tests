@@ -511,7 +511,7 @@ class UpgradeTest(FillDatabaseData):
         # write workload during entire test
         self.log.info('Starting c-s write workload during entire test')
         write_stress_during_entire_test = self.params.get('write_stress_during_entire_test')
-        entire_write_cs_thread_pool = self.run_stress_thread(stress_cmd=write_stress_during_entire_test)
+        entire_write_cs_thread_pool = self.run_stress_thread(stress_cmd=write_stress_during_entire_test, keyspace_name='keyspace_entire_test')
 
         # Let to write_stress_during_entire_test complete the schema changes
         self.metric_has_data(
