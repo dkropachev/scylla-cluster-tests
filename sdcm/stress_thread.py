@@ -106,7 +106,8 @@ class CassandraStressThread:  # pylint: disable=too-many-instance-attributes
             self.keyspace_name = keyspace_name
 
         if self.keyspace_name:
-            stress_cmd = stress_cmd.replace(" -schema ", " -schema keyspace={} ".format(self.keyspace_name))
+            if 'keyspace=' + self.keyspace_name not in stress_cmd:
+                stress_cmd = stress_cmd.replace(" -schema ", " -schema keyspace={} ".format(self.keyspace_name))
         elif 'keyspace=' not in stress_cmd:  # if keyspace is defined in the command respect that
             stress_cmd = stress_cmd.replace(" -schema ", " -schema keyspace=keyspace{} ".format(keyspace_idx))
 
