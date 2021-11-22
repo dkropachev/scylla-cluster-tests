@@ -54,18 +54,19 @@ class FullScanThread:
         cmd = random.choice(self.query_options).format(ks_cf)
         return self.randomly_add_timeout(cmd)
 
-    def create_session(self, db_node: BaseNode):
+    def create_session(self, db_node: BaseNode, keyspace: str = None):
         credentials = self.db_cluster.get_db_auth()
         username, password = credentials if credentials else (None, None)
-        return self.db_cluster.cql_connection_patient(db_node, user=username, password=password)
+        return self.db_cluster.cql_connection_patient(db_node, user=username, password=password, keyspace=keyspace)
 
     def run_fullscan(self, db_node: BaseNode):  # pylint: disable=too-many-locals
         ks_cf = self.get_ks_cs(db_node)
+        keyspace = ks_cf.split('.')[0]
         read_pages = random.choice([100, 1000, 0])
         with FullScanEvent(node=db_node.name, ks_cf=ks_cf, message="") as fs_event:
             cmd = self.randomly_form_cql_statement(ks_cf)
 
-            with self.create_session(db_node) as session:
+            with self.create_session(db_node, keyspace=keyspace) as session:
 
                 if self.termination_event.is_set():
                     return
