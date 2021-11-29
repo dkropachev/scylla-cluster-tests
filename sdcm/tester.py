@@ -21,7 +21,6 @@ import stat
 import time
 import unittest
 import unittest.mock
-import warnings
 from typing import NamedTuple, Optional, Union, List, Dict, Any
 from uuid import uuid4, UUID
 from functools import wraps, cached_property, cache
@@ -112,8 +111,7 @@ try:
 except ImportError:
     pass
 
-warnings.filterwarnings(action="ignore", message="unclosed",
-                        category=ResourceWarning)
+
 TEST_LOG = logging.getLogger(__name__)
 
 
