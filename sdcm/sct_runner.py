@@ -381,7 +381,7 @@ class AwsSctRunner(SctRunner):
     BASE_IMAGE = "ami-0c4a211d2b7c38400"  # ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-20210907
     SOURCE_IMAGE_REGION = "eu-west-2"  # where the source Runner image will be created and copied to other regions
     IMAGE_BUILDER_INSTANCE_TYPE = "t2.small"
-    REGULAR_TEST_INSTANCE_TYPE = "t3.large"  # 2 vcpus, 8G, 36 CPU credits/hour
+    REGULAR_TEST_INSTANCE_TYPE = "r5.large"  # 2 vcpus, 8G, 36 CPU credits/hour
     LONGTERM_TEST_INSTANCE_TYPE = "r5.large"  # 2 vcpus, 16G
 
     def __init__(self, region_name: str, availability_zone: str):
