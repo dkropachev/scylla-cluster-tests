@@ -25,7 +25,7 @@ from sdcm.remote.base import CommandRunner
 from sdcm.sct_events.base import LogEvent
 from sdcm.sct_events.database import get_pattern_to_event_to_func_mapping, BACKTRACE_RE
 from sdcm.sct_events.decorators import raise_event_on_failure
-
+from sdcm.utils.common import make_threads_be_daemonic_by_default
 
 LOGGER = logging.getLogger(__name__)
 
@@ -173,6 +173,7 @@ class DbLogReader(Process):
         LOGGER.info('Logging for node %s is started with following configuration:\nsystem_log=%s'
                     '\nlog_lines=%s\ndecoding_queue=%s',
                     self._node_name, self._system_log, self._log_lines, self._decoding_queue is not None)
+        make_threads_be_daemonic_by_default()
         while not self._terminate_event.wait(0.1):
             try:
                 self._read_and_publish_events()
