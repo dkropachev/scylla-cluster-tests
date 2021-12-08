@@ -68,13 +68,3 @@ class AWSInstanceParams(InstanceParamsBase):
     SecurityGroups: List[str] = None
     AddressingType: str = None
     EbsOptimized: bool = None
-
-    @validator('UserData')
-    def validate_user_data_raw(cls, value: str):  # pylint: disable=no-self-argument,no-self-use
-        try:
-            assert base64.b64encode(base64.b64decode(value)).decode('ascii') == value
-        except AssertionError:
-            raise
-        except Exception:  # pylint: disable=broad-except
-            assert False, 'UserData is not base64 formatted'
-        return value

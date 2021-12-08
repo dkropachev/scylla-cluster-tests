@@ -34,6 +34,7 @@ class AWSInstanceParamsBuilder(AWSInstanceParamsBuilderBase, metaclass=abc.ABCMe
     _INSTANCE_TYPE_PARAM_NAME: str = None
     _IMAGE_ID_PARAM_NAME: str = None
     _ROOT_DISK_SIZE_PARAM_NAME: str = None
+    _USER_DATA_BASE64_ENCODED: bool = True
 
     @property
     def BlockDeviceMappings(self) -> List[AWSDiskMapping]:  # pylint: disable=invalid-name
@@ -96,7 +97,9 @@ class AWSInstanceParamsBuilder(AWSInstanceParamsBuilderBase, metaclass=abc.ABCMe
             user_data = self.user_data_raw.to_string()
         else:
             user_data = self.user_data_raw
-        return base64.b64encode(user_data.encode('utf-8')).decode("ascii")
+        if self._USER_DATA_BASE64_ENCODED:
+            return base64.b64encode(user_data.encode('utf-8')).decode("ascii")
+        return user_data
 
     @cached_property
     def _root_device_name(self):
@@ -150,6 +153,7 @@ class ScyllaInstanceParamsBuilder(AWSInstanceParamsBuilder):
     _INSTANCE_TYPE_PARAM_NAME = 'instance_type_db'
     _IMAGE_ID_PARAM_NAME = 'ami_id_db_scylla'
     _ROOT_DISK_SIZE_PARAM_NAME = 'aws_root_disk_size_db'
+    _USER_DATA_BASE64_ENCODED = False
 
     @property
     def BlockDeviceMappings(self) -> List[AWSDiskMapping]:
@@ -185,9 +189,11 @@ class LoaderInstanceParamsBuilder(AWSInstanceParamsBuilder):
     _INSTANCE_TYPE_PARAM_NAME = 'instance_type_loader'
     _IMAGE_ID_PARAM_NAME = 'ami_id_loader'
     _ROOT_DISK_SIZE_PARAM_NAME = 'aws_root_disk_size_loader'
+    _USER_DATA_BASE64_ENCODED = False
 
 
 class MonitorInstanceParamsBuilder(AWSInstanceParamsBuilder):
     _INSTANCE_TYPE_PARAM_NAME = 'instance_type_monitor'
     _IMAGE_ID_PARAM_NAME = 'ami_id_monitor'
     _ROOT_DISK_SIZE_PARAM_NAME = 'aws_root_disk_size_monitor'
+    _USER_DATA_BASE64_ENCODED = False
