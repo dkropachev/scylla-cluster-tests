@@ -93,6 +93,7 @@ def get_latte_operation_type(stress_cmd):
 
 class LatteStressThread(DockerBasedStressThread):
     DOCKER_IMAGE_PARAM_NAME = "stress_image.latte"
+    DRIVER_DOCKER_IMAGE_PARAM_NAME = "stress_image.latte-driver-image"
     SCHEMA_CMD_CALL_COUNTER = {}
 
     def set_stress_operation(self, stress_cmd):
@@ -188,7 +189,11 @@ class LatteStressThread(DockerBasedStressThread):
         # NOTE: set '--user' and '--password' params only if not defined explicitly
         if " --user" in self.stress_cmd and " --password" in self.stress_cmd:
             auth_config = ""
-        stress_cmd = f"{self.stress_cmd} {ssl_config}{auth_config} {datacenter}{rack}-q "
+        adapter_config = ""
+        driver_image_name = self.params.get(self.DRIVER_DOCKER_IMAGE_PARAM_NAME, "")
+        if driver_image_name:
+            adapter_config = f"--driver-socket /var/run/latte-adapter.sock --driver-image {driver_image_name}"
+        stress_cmd = f"{self.stress_cmd} {ssl_config}{auth_config}{adapter_config} {datacenter}{rack}-q "
         self.set_hdr_tags(self.stress_cmd)
 
         return stress_cmd
@@ -261,6 +266,8 @@ class LatteStressThread(DockerBasedStressThread):
             self.docker_image_name,
             command_line="-c 'tail -f /dev/null'",
             extra_docker_opts=(
+                "-v /var/run/docker.sock:/var/run/docker.sock "
+                "-v /var/run/latte-adapter.sock:/var/run/latte-adapter.sock "
                 "--network=host "
                 "--security-opt seccomp=unconfined "
                 f"--entrypoint /bin/bash {cpu_options} --label shell_marker={self.shell_marker}"
